@@ -952,6 +952,7 @@ proc package {tgtDir {edit false} {synth false} {part ""}} {
 		set IfPortMaps      [dict get $busIf PORT_MAPS]
         set LastDpPosition  [string last ":" $IfDefinition]
         set LastRtlPosition [string last "_rtl" $IfDefinition]
+        set LastIntPosition [string last "_int" $IfDefinition]
         set DefStringLength [string length $IfDefinition]
         if {$LastDpPosition == -1} {
             if {[expr {$DefStringLength - $LastRtlPosition - 4}] == 0} {
@@ -959,11 +960,18 @@ proc package {tgtDir {edit false} {synth false} {part ""}} {
             }
             set IfBusDef    [ipx::get_ipfiles -type busdef *:$IfDefinition:*]
             set IfBusAbs    [ipx::get_ipfiles -type busabs *:$IfDefinition\_rtl:*]
+        } elseif {[expr {$LastDpPosition - $LastRtlPosition - 4}] == 0} {
+            set IfDefinition [string replace $IfDefinition $LastRtlPosition [expr {$LastDpPosition - 1}] ""]
+            set LastDpPosition  [expr {$LastDpPosition - 4}]
+            set IfBusDef    [ipx::get_ipfiles -type busdef $IfDefinition]
+            set IfBusAbs    [ipx::get_ipfiles -type busabs [string replace $IfDefinition $LastDpPosition $LastDpPosition "_rtl:"]]
+        } elseif {[expr {$LastDpPosition - $LastIntPosition - 4}] == 0} {
+            set IfDefinition [string replace $IfDefinition $LastIntPosition [expr {$LastDpPosition - 1}] ""]
+            set LastDpPosition  [expr {$LastDpPosition - 4}]
+            set search [string replace $IfDefinition $LastDpPosition $LastDpPosition "_int:"]
+            set IfBusDef    [ipx::get_ipfiles -type busdef *[string replace $IfDefinition $LastDpPosition $LastDpPosition "_int:"]*]
+            set IfBusAbs    [ipx::get_ipfiles -type busabs *$IfDefinition*]
         } else {
-            if {[expr {$LastDpPosition - $LastRtlPosition - 4}] == 0} {
-                set IfDefinition [string replace $IfDefinition $LastRtlPosition [expr {$LastDpPosition - 1}] ""]
-                set LastDpPosition  [expr {$LastDpPosition - 4}]
-            }
             set IfBusDef    [ipx::get_ipfiles -type busdef $IfDefinition]
             set IfBusAbs    [ipx::get_ipfiles -type busabs [string replace $IfDefinition $LastDpPosition $LastDpPosition "_rtl:"]]
         }
@@ -976,8 +984,8 @@ proc package {tgtDir {edit false} {synth false} {part ""}} {
         }
         set IfBusDefVlnv    [get_property vlnv [lindex $IfBusDef 0]]
 		set IfBusAbsVlnv    [get_property vlnv [lindex $IfBusAbs 0]]
-        set AbsPortList     [get_property name [ipx::get_bus_abstraction_ports -of_objects [lindex $IfBusAbs 0]]]     
-        
+        set AbsPortList     [get_property name [ipx::get_bus_abstraction_ports -of_objects [lindex $IfBusAbs 0]]]
+
         ipx::add_bus_interface $IfName                      [ipx::current_core]
         set_property abstraction_type_vlnv $IfBusAbsVlnv    [ipx::get_bus_interfaces $IfName -of_objects [ipx::current_core]]
         set_property bus_type_vlnv $IfBusDefVlnv            [ipx::get_bus_interfaces $IfName -of_objects [ipx::current_core]]
@@ -1146,6 +1154,7 @@ proc package {tgtDir {edit false} {synth false} {part ""}} {
 	puts "*** Finish packaging ***"
 	variable IpRevision
 	set_property core_revision $IpRevision [ipx::current_core]
+	ipx::merge_project_changes ports [ipx::current_core]
 	ipx::create_xgui_files [ipx::current_core]
 	ipx::update_checksums [ipx::current_core]
 	ipx::save_core [ipx::current_core]
